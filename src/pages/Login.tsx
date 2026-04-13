@@ -7,13 +7,18 @@ import { Label } from "@/components/ui/label";
 import CyberBackground from "@/components/CyberBackground";
 import CyberCard from "@/components/CyberCard";
 import { toast } from "sonner";
+import { Separator } from "@/components/ui/separator";
 import { Shield, Eye, EyeOff } from "lucide-react";
+
+const DEMO_EMAIL = "demo@deepfakesentinel.io";
+const DEMO_PASSWORD = "DemoSentinel#2026!";
 
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [demoLoading, setDemoLoading] = useState(false);
   const navigate = useNavigate();
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -25,6 +30,25 @@ const Login = () => {
       toast.error(error.message);
     } else {
       toast.success("Access granted");
+      navigate("/dashboard");
+    }
+  };
+
+  const handleDemoLogin = async () => {
+    setDemoLoading(true);
+    // First try to sign in; if it fails, create the demo account then sign in
+    let { error } = await supabase.auth.signInWithPassword({ email: DEMO_EMAIL, password: DEMO_PASSWORD });
+    if (error) {
+      // Create demo account
+      await supabase.auth.signUp({ email: DEMO_EMAIL, password: DEMO_PASSWORD });
+      const res = await supabase.auth.signInWithPassword({ email: DEMO_EMAIL, password: DEMO_PASSWORD });
+      error = res.error;
+    }
+    setDemoLoading(false);
+    if (error) {
+      toast.error(error.message);
+    } else {
+      toast.success("Demo access granted");
       navigate("/dashboard");
     }
   };
@@ -87,6 +111,21 @@ const Login = () => {
             {loading ? "AUTHENTICATING..." : "LOGIN"}
           </Button>
         </form>
+
+        <div className="flex items-center gap-3 my-6">
+          <Separator className="flex-1 bg-border/50" />
+          <span className="text-xs text-muted-foreground tracking-widest">OR</span>
+          <Separator className="flex-1 bg-border/50" />
+        </div>
+
+        <Button
+          variant="neon-outline"
+          className="w-full"
+          onClick={handleDemoLogin}
+          disabled={demoLoading}
+        >
+          {demoLoading ? "ACCESSING DEMO..." : "USE DEMO ACCOUNT"}
+        </Button>
 
         <p className="text-center mt-6 text-sm text-muted-foreground">
           No account?{" "}
