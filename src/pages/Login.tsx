@@ -10,11 +10,16 @@ import { toast } from "sonner";
 import { Separator } from "@/components/ui/separator";
 import { Shield, Eye, EyeOff } from "lucide-react";
 
+const DEMO_EMAIL = "demo@deepfakesentinel.io";
+const DEMO_PASSWORD = "DemoSentinel#2026!";
+
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [demoLoading, setDemoLoading] = useState(false);
+  const navigate = useNavigate();
   const navigate = useNavigate();
 
   const handleLogin = async (e: React.FormEvent) => {
