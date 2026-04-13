@@ -34,6 +34,25 @@ const Login = () => {
     }
   };
 
+  const handleDemoLogin = async () => {
+    setDemoLoading(true);
+    // First try to sign in; if it fails, create the demo account then sign in
+    let { error } = await supabase.auth.signInWithPassword({ email: DEMO_EMAIL, password: DEMO_PASSWORD });
+    if (error) {
+      // Create demo account
+      await supabase.auth.signUp({ email: DEMO_EMAIL, password: DEMO_PASSWORD });
+      const res = await supabase.auth.signInWithPassword({ email: DEMO_EMAIL, password: DEMO_PASSWORD });
+      error = res.error;
+    }
+    setDemoLoading(false);
+    if (error) {
+      toast.error(error.message);
+    } else {
+      toast.success("Demo access granted");
+      navigate("/dashboard");
+    }
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
       <CyberBackground />
