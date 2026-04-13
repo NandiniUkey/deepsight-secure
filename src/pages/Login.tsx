@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import CyberBackground from "@/components/CyberBackground";
 import CyberCard from "@/components/CyberCard";
 import { toast } from "sonner";
+import { Separator } from "@/components/ui/separator";
 import { Shield, Eye, EyeOff } from "lucide-react";
 
 const Login = () => {
