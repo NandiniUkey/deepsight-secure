@@ -112,6 +112,21 @@ const Login = () => {
           </Button>
         </form>
 
+        <div className="flex items-center gap-3 my-6">
+          <Separator className="flex-1 bg-border/50" />
+          <span className="text-xs text-muted-foreground tracking-widest">OR</span>
+          <Separator className="flex-1 bg-border/50" />
+        </div>
+
+        <Button
+          variant="neon-outline"
+          className="w-full"
+          onClick={handleDemoLogin}
+          disabled={demoLoading}
+        >
+          {demoLoading ? "ACCESSING DEMO..." : "USE DEMO ACCOUNT"}
+        </Button>
+
         <p className="text-center mt-6 text-sm text-muted-foreground">
           No account?{" "}
           <Link to="/register" className="text-primary hover:text-glow-green transition-all">
