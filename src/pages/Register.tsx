@@ -27,15 +27,38 @@ const Register = () => {
       toast.error("Password must be at least 6 characters");
       return;
     }
+
+    const normalizedEmail = email.trim().toLowerCase();
+
     setLoading(true);
-    const { error } = await supabase.auth.signUp({ email, password });
+    const { data, error } = await supabase.auth.signUp({
+      email: normalizedEmail,
+      password,
+      options: {
+        emailRedirectTo: `${window.location.origin}/login`,
+      },
+    });
     setLoading(false);
+
     if (error) {
+      if (error.message.toLowerCase().includes("already registered")) {
+        toast.error("This email already has an account. Log in or reset your password.");
+        navigate(`/login?email=${encodeURIComponent(normalizedEmail)}`);
+        return;
+      }
+
       toast.error(error.message);
-    } else {
-      toast.success("Registration complete. Check your email to verify.");
-      navigate("/login");
+      return;
     }
+
+    if (data.session) {
+      toast.success("Registration complete. Access granted.");
+      navigate("/dashboard");
+      return;
+    }
+
+    toast.success("Registration complete. Check your email to verify.");
+    navigate(`/login?email=${encodeURIComponent(normalizedEmail)}`);
   };
 
   return (
