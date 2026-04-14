@@ -155,16 +155,18 @@ const Dashboard = () => {
     try {
       let detection: DetectionResponse;
 
-      // Use local TM model for images, AI gateway for videos
+      // Use local TM model for images (upload or URL), AI gateway for videos
       if (mediaType === "image" && modelReady) {
         detection = await analyzeWithLocalModel();
       } else {
+        // For videos (both upload and URL) and images when model not ready
         detection = await analyzeWithAI();
       }
 
       setResult(detection);
     } catch (err: any) {
-      toast.error(err.message || "Analysis failed");
+      console.error("Analysis error:", err);
+      toast.error(err.message || "Analysis failed. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -306,6 +308,17 @@ const Dashboard = () => {
                     placeholder={`https://example.com/${mediaType === "image" ? "photo.jpg" : "video.mp4"}`}
                   />
                 </div>
+                {/* URL Preview */}
+                {url.trim() && mediaType === "image" && (
+                  <div className="border border-border rounded-lg overflow-hidden mt-3">
+                    <img src={url.trim()} alt="URL Preview" className="w-full max-h-64 object-contain bg-secondary/30" onError={(e) => (e.currentTarget.style.display = "none")} />
+                  </div>
+                )}
+                {url.trim() && mediaType === "video" && (
+                  <div className="border border-border rounded-lg overflow-hidden mt-3">
+                    <video src={url.trim()} controls className="w-full max-h-64 bg-secondary/30" onError={(e) => (e.currentTarget.style.display = "none")} />
+                  </div>
+                )}
               </TabsContent>
             </Tabs>
 
