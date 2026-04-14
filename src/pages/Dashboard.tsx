@@ -308,6 +308,17 @@ const Dashboard = () => {
                     placeholder={`https://example.com/${mediaType === "image" ? "photo.jpg" : "video.mp4"}`}
                   />
                 </div>
+                {/* URL Preview */}
+                {url.trim() && mediaType === "image" && (
+                  <div className="border border-border rounded-lg overflow-hidden mt-3">
+                    <img src={url.trim()} alt="URL Preview" className="w-full max-h-64 object-contain bg-secondary/30" onError={(e) => (e.currentTarget.style.display = "none")} />
+                  </div>
+                )}
+                {url.trim() && mediaType === "video" && (
+                  <div className="border border-border rounded-lg overflow-hidden mt-3">
+                    <video src={url.trim()} controls className="w-full max-h-64 bg-secondary/30" onError={(e) => (e.currentTarget.style.display = "none")} />
+                  </div>
+                )}
               </TabsContent>
             </Tabs>
 
