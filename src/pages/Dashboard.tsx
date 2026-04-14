@@ -135,7 +135,8 @@ const Dashboard = () => {
       body: payload,
     });
 
-    if (error) throw error;
+    if (error) throw new Error(error.message || "Analysis failed");
+    if (data?.error) throw new Error(data.error);
     return data as DetectionResponse;
   };
 
