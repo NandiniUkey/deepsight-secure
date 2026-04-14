@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,25 +13,69 @@ import { Shield, Eye, EyeOff } from "lucide-react";
 const DEMO_EMAIL = "demo@deepfakesentinel.io";
 const DEMO_PASSWORD = "DemoSentinel#2026!";
 
+const getAuthErrorMessage = (message: string) => {
+  if (message.toLowerCase().includes("invalid login credentials")) {
+    return "Invalid email or password. If this account already exists, use Forgot password to reset it.";
+  }
+
+  return message;
+};
+
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [demoLoading, setDemoLoading] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  useEffect(() => {
+    const emailParam = searchParams.get("email");
+    if (emailParam) {
+      setEmail(emailParam);
+    }
+  }, [searchParams]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    const normalizedEmail = email.trim().toLowerCase();
+
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await supabase.auth.signInWithPassword({ email: normalizedEmail, password });
     setLoading(false);
+
     if (error) {
-      toast.error(error.message);
+      toast.error(getAuthErrorMessage(error.message));
     } else {
       toast.success("Access granted");
       navigate("/dashboard");
     }
+  };
+
+  const handleResetPassword = async () => {
+    const normalizedEmail = email.trim().toLowerCase();
+
+    if (!normalizedEmail) {
+      toast.error("Enter your email address first");
+      return;
+    }
+
+    setResetLoading(true);
+
+    const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+
+    setResetLoading(false);
+
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+
+    toast.success("Password reset link sent. Check your email.");
   };
 
   const handleDemoLogin = async () => {
@@ -112,6 +156,14 @@ const Login = () => {
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
+            <button
+              type="button"
+              onClick={handleResetPassword}
+              disabled={resetLoading}
+              className="ml-auto block text-xs tracking-[0.24em] uppercase text-primary transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {resetLoading ? "SENDING RESET..." : "Forgot password?"}
+            </button>
           </div>
           <Button type="submit" variant="neon" className="w-full" disabled={loading}>
             {loading ? "AUTHENTICATING..." : "LOGIN"}
