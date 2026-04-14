@@ -155,16 +155,18 @@ const Dashboard = () => {
     try {
       let detection: DetectionResponse;
 
-      // Use local TM model for images, AI gateway for videos
+      // Use local TM model for images (upload or URL), AI gateway for videos
       if (mediaType === "image" && modelReady) {
         detection = await analyzeWithLocalModel();
       } else {
+        // For videos (both upload and URL) and images when model not ready
         detection = await analyzeWithAI();
       }
 
       setResult(detection);
     } catch (err: any) {
-      toast.error(err.message || "Analysis failed");
+      console.error("Analysis error:", err);
+      toast.error(err.message || "Analysis failed. Please try again.");
     } finally {
       setLoading(false);
     }

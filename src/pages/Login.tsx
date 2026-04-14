@@ -36,20 +36,26 @@ const Login = () => {
 
   const handleDemoLogin = async () => {
     setDemoLoading(true);
-    // First try to sign in; if it fails, create the demo account then sign in
-    let { error } = await supabase.auth.signInWithPassword({ email: DEMO_EMAIL, password: DEMO_PASSWORD });
-    if (error) {
-      // Create demo account
-      await supabase.auth.signUp({ email: DEMO_EMAIL, password: DEMO_PASSWORD });
-      const res = await supabase.auth.signInWithPassword({ email: DEMO_EMAIL, password: DEMO_PASSWORD });
-      error = res.error;
-    }
-    setDemoLoading(false);
-    if (error) {
-      toast.error(error.message);
-    } else {
+    try {
+      // Try sign in first
+      let { error } = await supabase.auth.signInWithPassword({ email: DEMO_EMAIL, password: DEMO_PASSWORD });
+      if (error) {
+        // Create demo account (auto-confirm is enabled)
+        const { error: signUpError } = await supabase.auth.signUp({ email: DEMO_EMAIL, password: DEMO_PASSWORD });
+        if (signUpError && !signUpError.message.includes("already registered")) {
+          throw signUpError;
+        }
+        // Wait briefly for account to be ready
+        await new Promise(r => setTimeout(r, 1000));
+        const res = await supabase.auth.signInWithPassword({ email: DEMO_EMAIL, password: DEMO_PASSWORD });
+        if (res.error) throw res.error;
+      }
       toast.success("Demo access granted");
       navigate("/dashboard");
+    } catch (err: any) {
+      toast.error(err.message || "Demo login failed");
+    } finally {
+      setDemoLoading(false);
     }
   };
 
