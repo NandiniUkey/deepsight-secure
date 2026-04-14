@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { useTeachableModel } from "@/hooks/useTeachableModel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,7 +13,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Shield, LogOut, Upload, Link as LinkIcon, Image, Video,
-  ScanSearch, Loader2
+  ScanSearch, Loader2, Brain
 } from "lucide-react";
 
 interface DetectionResponse {
@@ -25,6 +26,7 @@ interface DetectionResponse {
 const Dashboard = () => {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
+  const { modelReady, modelError, predict } = useTeachableModel();
   const [mediaType, setMediaType] = useState<"image" | "video">("image");
   const [inputMethod, setInputMethod] = useState<"upload" | "url">("upload");
   const [url, setUrl] = useState("");
@@ -49,6 +51,94 @@ const Dashboard = () => {
     navigate("/login");
   };
 
+  const analyzeWithLocalModel = async (): Promise<DetectionResponse> => {
+    let imgSrc = preview;
+
+    // If URL input, load the image
+    if (inputMethod === "url" && url.trim()) {
+      imgSrc = url.trim();
+    }
+
+    if (!imgSrc) throw new Error("No image to analyze");
+
+    const img = document.createElement("img");
+    img.crossOrigin = "anonymous";
+    img.src = imgSrc;
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error("Failed to load image"));
+    });
+
+    const predictions = await predict(img);
+    const realPred = predictions.find(p => p.className.toLowerCase() === "real");
+    const fakePred = predictions.find(p => p.className.toLowerCase() === "fake");
+
+    const realProb = realPred?.probability ?? 0;
+    const fakeProb = fakePred?.probability ?? 0;
+
+    let verdict: "REAL" | "FAKE" | "SUSPICIOUS";
+    let confidence: number;
+
+    if (fakeProb > 0.75) {
+      verdict = "FAKE";
+      confidence = Math.round(fakeProb * 100);
+    } else if (realProb > 0.75) {
+      verdict = "REAL";
+      confidence = Math.round(realProb * 100);
+    } else {
+      verdict = "SUSPICIOUS";
+      confidence = Math.round(Math.max(realProb, fakeProb) * 100);
+    }
+
+    const indicators: string[] = [];
+    indicators.push(`Real probability: ${(realProb * 100).toFixed(1)}%`);
+    indicators.push(`Fake probability: ${(fakeProb * 100).toFixed(1)}%`);
+
+    if (verdict === "FAKE") {
+      indicators.push("Model detected manipulation patterns consistent with deepfake generation");
+      indicators.push("Image features diverge from natural photograph characteristics");
+    } else if (verdict === "REAL") {
+      indicators.push("Image features consistent with natural photograph characteristics");
+      indicators.push("No significant manipulation patterns detected");
+    } else {
+      indicators.push("Model confidence is below threshold — manual review recommended");
+      indicators.push("Some features may indicate subtle manipulation");
+    }
+
+    const analysis =
+      verdict === "FAKE"
+        ? `The trained detection model identified this image as manipulated with ${confidence}% confidence. The image exhibits patterns commonly associated with AI-generated or modified content.`
+        : verdict === "REAL"
+        ? `The trained detection model classified this image as authentic with ${confidence}% confidence. No significant signs of digital manipulation were detected.`
+        : `The detection model could not make a definitive determination. The confidence level of ${confidence}% suggests the image may have subtle anomalies that warrant further investigation.`;
+
+    return { verdict, confidence, analysis, indicators };
+  };
+
+  const analyzeWithAI = async (): Promise<DetectionResponse> => {
+    let payload: Record<string, string> = { mediaType };
+
+    if (inputMethod === "url") {
+      payload.url = url.trim();
+    } else if (file) {
+      const reader = new FileReader();
+      const base64 = await new Promise<string>((resolve) => {
+        reader.onload = () => resolve((reader.result as string).split(",")[1]);
+        reader.readAsDataURL(file);
+      });
+      payload.base64 = base64;
+      payload.filename = file.name;
+      payload.mimeType = file.type;
+    }
+
+    const { data, error } = await supabase.functions.invoke("detect-deepfake", {
+      body: payload,
+    });
+
+    if (error) throw error;
+    return data as DetectionResponse;
+  };
+
   const handleAnalyze = async () => {
     if (inputMethod === "upload" && !file) {
       toast.error("Please select a file to analyze");
@@ -63,27 +153,16 @@ const Dashboard = () => {
     setResult(null);
 
     try {
-      let payload: Record<string, string> = { mediaType };
+      let detection: DetectionResponse;
 
-      if (inputMethod === "url") {
-        payload.url = url.trim();
-      } else if (file) {
-        const reader = new FileReader();
-        const base64 = await new Promise<string>((resolve) => {
-          reader.onload = () => resolve((reader.result as string).split(",")[1]);
-          reader.readAsDataURL(file);
-        });
-        payload.base64 = base64;
-        payload.filename = file.name;
-        payload.mimeType = file.type;
+      // Use local TM model for images, AI gateway for videos
+      if (mediaType === "image" && modelReady) {
+        detection = await analyzeWithLocalModel();
+      } else {
+        detection = await analyzeWithAI();
       }
 
-      const { data, error } = await supabase.functions.invoke("detect-deepfake", {
-        body: payload,
-      });
-
-      if (error) throw error;
-      setResult(data as DetectionResponse);
+      setResult(detection);
     } catch (err: any) {
       toast.error(err.message || "Analysis failed");
     } finally {
@@ -113,6 +192,12 @@ const Dashboard = () => {
             </span>
           </div>
           <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Brain className={`w-4 h-4 ${modelReady ? "text-primary" : "text-muted-foreground"}`} />
+              <span className={`text-xs tracking-wider ${modelReady ? "text-primary" : "text-muted-foreground"}`}>
+                {modelReady ? "MODEL READY" : modelError ? "MODEL ERROR" : "LOADING MODEL..."}
+              </span>
+            </div>
             <span className="text-xs text-muted-foreground tracking-wider hidden sm:block">
               {user?.email}
             </span>
@@ -125,13 +210,14 @@ const Dashboard = () => {
 
       {/* Main */}
       <main className="container py-8 space-y-8">
-        {/* Title section */}
         <div className="text-center space-y-2">
           <h1 className="text-3xl md:text-4xl font-heading tracking-wider text-foreground text-glow-cyan animate-flicker">
             MEDIA ANALYSIS CONSOLE
           </h1>
           <p className="text-muted-foreground tracking-wide text-sm">
-            Upload or provide a URL to scan media for deepfake manipulation
+            {modelReady
+              ? "Custom-trained model active — upload or provide a URL to scan media"
+              : "Upload or provide a URL to scan media for deepfake manipulation"}
           </p>
         </div>
 
@@ -163,6 +249,16 @@ const Dashboard = () => {
                   <Video className="w-3 h-3 mr-1" /> VIDEO
                 </Button>
               </div>
+              {mediaType === "image" && modelReady && (
+                <p className="text-xs text-primary tracking-wide">
+                  ⚡ Using your custom-trained model for image detection
+                </p>
+              )}
+              {mediaType === "video" && (
+                <p className="text-xs text-muted-foreground tracking-wide">
+                  Videos analyzed via AI vision model
+                </p>
+              )}
             </div>
 
             {/* Input method */}
